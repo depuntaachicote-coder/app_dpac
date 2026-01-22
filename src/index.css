@@ -1,0 +1,109 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-white text-primary-900 font-sans antialiased;
+    overflow-x: hidden;
+  }
+
+  ::selection {
+    @apply bg-primary-900 text-white;
+  }
+}
+
+@layer components {
+  .line-accent {
+    @apply relative;
+  }
+
+  .line-accent::after {
+    content: '';
+    @apply absolute bottom-0 left-0 w-full h-px bg-primary-900 transform scale-x-0 origin-left transition-transform duration-500;
+  }
+
+  .line-accent:hover::after {
+    @apply scale-x-100;
+  }
+
+  .btn-primary {
+    @apply px-8 py-4 bg-primary-900 text-white font-medium tracking-wide
+           border border-primary-900 transition-all duration-300
+           hover:bg-white hover:text-primary-900;
+  }
+
+  .btn-secondary {
+    @apply px-8 py-4 bg-white text-primary-900 font-medium tracking-wide
+           border border-primary-900 transition-all duration-300
+           hover:bg-primary-900 hover:text-white;
+  }
+
+  .input-minimal {
+    @apply w-full px-4 py-3 bg-transparent border-b border-primary-300
+           focus:border-primary-900 focus:outline-none transition-colors duration-300
+           placeholder:text-primary-400;
+  }
+
+  .card-elegant {
+    @apply bg-white border border-primary-200 p-6
+           hover:border-primary-900 transition-colors duration-300;
+  }
+
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary-900 to-primary-600;
+  }
+}
+
+@layer utilities {
+  .animation-delay-100 {
+    animation-delay: 100ms;
+  }
+  .animation-delay-200 {
+    animation-delay: 200ms;
+  }
+  .animation-delay-300 {
+    animation-delay: 300ms;
+  }
+  .animation-delay-400 {
+    animation-delay: 400ms;
+  }
+  .animation-delay-500 {
+    animation-delay: 500ms;
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-primary-100;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-primary-400 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-primary-600;
+}
