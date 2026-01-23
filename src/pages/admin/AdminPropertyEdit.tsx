@@ -16,6 +16,26 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner'
 
 const propertyTypes = ['Hotel', 'Casa Rural', 'Apartamento', 'Hostal', 'Pazo', 'Otro']
 const provinces = ['A Coruña', 'Lugo', 'Ourense', 'Pontevedra']
+const availableAmenities = [
+  'WiFi',
+  'Parking',
+  'Desayuno',
+  'Piscina',
+  'Restaurante',
+  'Spa',
+  'Gimnasio',
+  'Aire acondicionado',
+  'Calefacción',
+  'Terraza',
+  'Jardín',
+  'Vistas al mar',
+  'Vistas a la montaña',
+  'Admite mascotas',
+  'Accesible',
+  'Cocina',
+  'Lavadora',
+  'TV',
+]
 
 export default function AdminPropertyEdit() {
   const { id } = useParams<{ id: string }>()
@@ -172,6 +192,15 @@ export default function AdminPropertyEdit() {
       ...prev,
       name,
       slug: prev.slug || generateSlug(name),
+    }))
+  }
+
+  const handleAmenityToggle = (amenity: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      amenities: prev.amenities.includes(amenity)
+        ? prev.amenities.filter((a) => a !== amenity)
+        : [...prev.amenities, amenity],
     }))
   }
 
@@ -694,6 +723,33 @@ export default function AdminPropertyEdit() {
                 Introduce las valoraciones manualmente desde el enlace
               </p>
             </div>
+          </div>
+        </div>
+
+        {/* Amenities */}
+        <div className="bg-white border border-primary-200 p-6">
+          <h2 className="font-display text-xl font-semibold text-primary-900 mb-6">
+            Servicios
+          </h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            {availableAmenities.map((amenity) => (
+              <label
+                key={amenity}
+                className={`flex items-center gap-2 p-3 border cursor-pointer transition-colors ${
+                  formData.amenities.includes(amenity)
+                    ? 'border-primary-900 bg-primary-50'
+                    : 'border-primary-200 hover:border-primary-400'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={formData.amenities.includes(amenity)}
+                  onChange={() => handleAmenityToggle(amenity)}
+                  className="w-4 h-4 text-primary-900 focus:ring-primary-900"
+                />
+                <span className="text-sm text-primary-800">{amenity}</span>
+              </label>
+            ))}
           </div>
         </div>
 
