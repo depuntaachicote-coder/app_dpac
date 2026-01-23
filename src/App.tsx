@@ -27,6 +27,7 @@ import AdminPropertyEdit from './pages/admin/AdminPropertyEdit'
 import AdminUsers from './pages/admin/AdminUsers'
 import AdminMedia from './pages/admin/AdminMedia'
 import AdminSocial from './pages/admin/AdminSocial'
+import AdminEmailMarketing from './pages/admin/AdminEmailMarketing'
 
 // Auth Provider
 import { AuthProvider } from './context/AuthContext'
@@ -76,6 +77,7 @@ function App() {
             <Route path="/admin/usuarios" element={<AdminUsers />} />
             <Route path="/admin/media" element={<AdminMedia />} />
             <Route path="/admin/social" element={<AdminSocial />} />
+            <Route path="/admin/email-marketing" element={<AdminEmailMarketing />} />
           </Route>
         </Routes>
       </AnimatePresence>

@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, useScroll, useTransform, useInView } from 'framer-motion'
 import {
@@ -12,10 +12,14 @@ import {
   Play,
   Instagram,
   Youtube,
+  Mail,
+  Check,
+  Loader2,
 } from 'lucide-react'
 import AnimatedLine from '../components/ui/AnimatedLine'
 import PropertyCard from '../components/property/PropertyCard'
 import { useProperties } from '../hooks/useProperties'
+import { supabase } from '../lib/supabase'
 
 const services = [
   {
@@ -56,6 +60,48 @@ export default function Landing() {
   const heroRef = useRef<HTMLDivElement>(null)
   const servicesRef = useRef<HTMLDivElement>(null)
   const rankingRef = useRef<HTMLDivElement>(null)
+  const newsletterRef = useRef<HTMLDivElement>(null)
+
+  // Newsletter subscription state
+  const [email, setEmail] = useState('')
+  const [name, setName] = useState('')
+  const [subscribeStatus, setSubscribeStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
+  const [errorMessage, setErrorMessage] = useState('')
+
+  const handleSubscribe = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!email) return
+
+    setSubscribeStatus('loading')
+    setErrorMessage('')
+
+    try {
+      const { error } = await supabase.from('email_subscribers').insert({
+        email: email.toLowerCase().trim(),
+        name: name.trim() || null,
+        source: 'landing_page',
+        tags: ['newsletter', 'landing'],
+      } as never)
+
+      if (error) {
+        if (error.code === '23505') {
+          // Duplicate email
+          setErrorMessage('Este email ya esta suscrito')
+          setSubscribeStatus('error')
+        } else {
+          throw error
+        }
+      } else {
+        setSubscribeStatus('success')
+        setEmail('')
+        setName('')
+      }
+    } catch (error) {
+      console.error('Error subscribing:', error)
+      setErrorMessage('Ha ocurrido un error. Intentalo de nuevo.')
+      setSubscribeStatus('error')
+    }
+  }
 
   const { scrollYProgress } = useScroll({
     target: heroRef,
@@ -67,8 +113,9 @@ export default function Landing() {
 
   const servicesInView = useInView(servicesRef, { once: true, margin: '-100px' })
   const rankingInView = useInView(rankingRef, { once: true, margin: '-100px' })
+  const newsletterInView = useInView(newsletterRef, { once: true, margin: '-100px' })
 
-  const { properties: topProperties, loading } = useProperties({ limit: 3, featured: true })
+  const { properties: topProperties, loading: propertiesLoading } = useProperties({ limit: 3, featured: true })
 
   return (
     <div className="overflow-hidden">
@@ -308,7 +355,7 @@ export default function Landing() {
           </motion.div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {loading ? (
+            {propertiesLoading ? (
               // Skeleton loading
               Array.from({ length: 3 }).map((_, i) => (
                 <div key={i} className="animate-pulse">
@@ -509,6 +556,99 @@ export default function Landing() {
               </p>
             </motion.div>
           </div>
+        </div>
+      </section>
+
+      {/* Newsletter Section */}
+      <section ref={newsletterRef} className="py-24 sm:py-32 bg-primary-900 text-white relative overflow-hidden">
+        {/* Decorative elements */}
+        <div className="absolute top-0 right-0 w-80 h-80 border border-primary-700 translate-x-1/2 -translate-y-1/2 opacity-50" />
+        <div className="absolute bottom-0 left-0 w-64 h-64 border border-primary-700 -translate-x-1/2 translate-y-1/2 opacity-50" />
+
+        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            animate={newsletterInView ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 0.8 }}
+            className="text-center"
+          >
+            <div className="inline-flex items-center justify-center w-16 h-16 border border-primary-600 mb-8">
+              <Mail size={28} className="text-primary-300" />
+            </div>
+
+            <h2 className="font-display text-4xl sm:text-5xl font-bold">
+              Mantente informado
+            </h2>
+            <p className="mt-6 text-lg text-primary-300 max-w-2xl mx-auto">
+              Suscribete a nuestra newsletter para recibir las ultimas novedades,
+              los mejores hospedajes y consejos exclusivos para tu alojamiento turistico.
+            </p>
+
+            {subscribeStatus === 'success' ? (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="mt-10 p-6 bg-green-500/20 border border-green-500/30 max-w-md mx-auto"
+              >
+                <div className="flex items-center justify-center gap-3">
+                  <Check size={24} className="text-green-400" />
+                  <span className="text-lg font-medium">¡Gracias por suscribirte!</span>
+                </div>
+                <p className="text-primary-300 mt-2 text-sm">
+                  Pronto recibiras noticias nuestras.
+                </p>
+              </motion.div>
+            ) : (
+              <form onSubmit={handleSubscribe} className="mt-10 max-w-xl mx-auto">
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Tu nombre"
+                    className="flex-1 px-6 py-4 bg-primary-800 border border-primary-700 text-white placeholder-primary-400 focus:outline-none focus:border-white transition-colors"
+                  />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Tu email"
+                    required
+                    className="flex-1 px-6 py-4 bg-primary-800 border border-primary-700 text-white placeholder-primary-400 focus:outline-none focus:border-white transition-colors"
+                  />
+                </div>
+
+                {errorMessage && (
+                  <p className="mt-3 text-red-400 text-sm">{errorMessage}</p>
+                )}
+
+                <motion.button
+                  type="submit"
+                  disabled={subscribeStatus === 'loading' || !email}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="mt-4 w-full sm:w-auto px-10 py-4 bg-white text-primary-900 font-medium hover:bg-primary-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mx-auto"
+                >
+                  {subscribeStatus === 'loading' ? (
+                    <>
+                      <Loader2 size={20} className="animate-spin" />
+                      Suscribiendo...
+                    </>
+                  ) : (
+                    <>
+                      <Mail size={20} />
+                      Suscribirme
+                    </>
+                  )}
+                </motion.button>
+
+                <p className="mt-6 text-sm text-primary-400">
+                  Al suscribirte aceptas recibir comunicaciones de De Punta a Chicote.
+                  Puedes darte de baja en cualquier momento.
+                </p>
+              </form>
+            )}
+          </motion.div>
         </div>
       </section>
 

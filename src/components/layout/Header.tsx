@@ -13,8 +13,11 @@ const navLinks = [
 export default function Header() {
   const [isOpen, setIsOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
-  const { user, isAdmin } = useAuth()
+  const { user, profile, loading, isAdmin } = useAuth()
   const location = useLocation()
+
+  // Only show authenticated state when fully loaded and profile exists
+  const isAuthenticated = !loading && user && profile
 
   useEffect(() => {
     const handleScroll = () => {
@@ -71,7 +74,9 @@ export default function Header() {
 
           {/* Auth Buttons */}
           <div className="hidden md:flex items-center gap-4">
-            {user ? (
+            {loading ? (
+              <div className="w-24 h-10 bg-primary-100 animate-pulse" />
+            ) : isAuthenticated ? (
               <Link
                 to={isAdmin ? '/admin' : '/dashboard'}
                 className="flex items-center gap-2 px-6 py-2.5 bg-primary-900 text-white text-sm font-medium rounded-none border border-primary-900 hover:bg-white hover:text-primary-900 transition-all duration-300"
@@ -132,7 +137,9 @@ export default function Header() {
                 </NavLink>
               ))}
               <div className="pt-4 space-y-3">
-                {user ? (
+                {loading ? (
+                  <div className="w-full h-12 bg-primary-100 animate-pulse" />
+                ) : isAuthenticated ? (
                   <Link
                     to={isAdmin ? '/admin' : '/dashboard'}
                     className="block w-full py-3 text-center bg-primary-900 text-white font-medium"

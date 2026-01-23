@@ -74,6 +74,11 @@ export interface Database {
           is_featured: boolean
           is_active: boolean
           owner_id: string | null
+          google_place_id: string | null
+          google_maps_url: string | null
+          booking_url: string | null
+          airbnb_url: string | null
+          ratings_updated_at: string | null
           created_at: string
           updated_at: string
         }
@@ -103,6 +108,11 @@ export interface Database {
           is_featured?: boolean
           is_active?: boolean
           owner_id?: string | null
+          google_place_id?: string | null
+          google_maps_url?: string | null
+          booking_url?: string | null
+          airbnb_url?: string | null
+          ratings_updated_at?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -132,6 +142,11 @@ export interface Database {
           is_featured?: boolean
           is_active?: boolean
           owner_id?: string | null
+          google_place_id?: string | null
+          google_maps_url?: string | null
+          booking_url?: string | null
+          airbnb_url?: string | null
+          ratings_updated_at?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -348,6 +363,191 @@ export interface Database {
           updated_at?: string
         }
       }
+      email_templates: {
+        Row: {
+          id: string
+          name: string
+          subject: string
+          content: string
+          category: 'introduccion' | 'servicios' | 'social' | 'promocion' | 'newsletter' | 'custom'
+          variables: string[]
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          subject: string
+          content: string
+          category: 'introduccion' | 'servicios' | 'social' | 'promocion' | 'newsletter' | 'custom'
+          variables?: string[]
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          subject?: string
+          content?: string
+          category?: 'introduccion' | 'servicios' | 'social' | 'promocion' | 'newsletter' | 'custom'
+          variables?: string[]
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      email_campaigns: {
+        Row: {
+          id: string
+          name: string
+          subject: string
+          content: string
+          template_id: string | null
+          status: 'draft' | 'scheduled' | 'sending' | 'sent' | 'cancelled'
+          scheduled_at: string | null
+          sent_at: string | null
+          total_recipients: number
+          total_sent: number
+          total_opened: number
+          total_clicked: number
+          total_bounced: number
+          total_unsubscribed: number
+          open_rate: number
+          click_rate: number
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          subject: string
+          content: string
+          template_id?: string | null
+          status?: 'draft' | 'scheduled' | 'sending' | 'sent' | 'cancelled'
+          scheduled_at?: string | null
+          sent_at?: string | null
+          total_recipients?: number
+          total_sent?: number
+          total_opened?: number
+          total_clicked?: number
+          total_bounced?: number
+          total_unsubscribed?: number
+          open_rate?: number
+          click_rate?: number
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          subject?: string
+          content?: string
+          template_id?: string | null
+          status?: 'draft' | 'scheduled' | 'sending' | 'sent' | 'cancelled'
+          scheduled_at?: string | null
+          sent_at?: string | null
+          total_recipients?: number
+          total_sent?: number
+          total_opened?: number
+          total_clicked?: number
+          total_bounced?: number
+          total_unsubscribed?: number
+          open_rate?: number
+          click_rate?: number
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      email_recipients: {
+        Row: {
+          id: string
+          campaign_id: string
+          email: string
+          user_id: string | null
+          status: 'pending' | 'sent' | 'delivered' | 'opened' | 'clicked' | 'bounced' | 'unsubscribed'
+          sent_at: string | null
+          opened_at: string | null
+          clicked_at: string | null
+          open_count: number
+          click_count: number
+          user_agent: string | null
+          ip_address: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          campaign_id: string
+          email: string
+          user_id?: string | null
+          status?: 'pending' | 'sent' | 'delivered' | 'opened' | 'clicked' | 'bounced' | 'unsubscribed'
+          sent_at?: string | null
+          opened_at?: string | null
+          clicked_at?: string | null
+          open_count?: number
+          click_count?: number
+          user_agent?: string | null
+          ip_address?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          campaign_id?: string
+          email?: string
+          user_id?: string | null
+          status?: 'pending' | 'sent' | 'delivered' | 'opened' | 'clicked' | 'bounced' | 'unsubscribed'
+          sent_at?: string | null
+          opened_at?: string | null
+          clicked_at?: string | null
+          open_count?: number
+          click_count?: number
+          user_agent?: string | null
+          ip_address?: string | null
+          created_at?: string
+        }
+      }
+      email_subscribers: {
+        Row: {
+          id: string
+          email: string
+          name: string | null
+          company: string | null
+          source: string
+          tags: string[]
+          is_subscribed: boolean
+          subscribed_at: string
+          unsubscribed_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          email: string
+          name?: string | null
+          company?: string | null
+          source?: string
+          tags?: string[]
+          is_subscribed?: boolean
+          subscribed_at?: string
+          unsubscribed_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          email?: string
+          name?: string | null
+          company?: string | null
+          source?: string
+          tags?: string[]
+          is_subscribed?: boolean
+          subscribed_at?: string
+          unsubscribed_at?: string | null
+          created_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never
@@ -367,3 +567,7 @@ export type Media = Database['public']['Tables']['media']['Row']
 export type Budget = Database['public']['Tables']['budgets']['Row']
 export type Invoice = Database['public']['Tables']['invoices']['Row']
 export type SocialPost = Database['public']['Tables']['social_posts']['Row']
+export type EmailTemplate = Database['public']['Tables']['email_templates']['Row']
+export type EmailCampaign = Database['public']['Tables']['email_campaigns']['Row']
+export type EmailRecipient = Database['public']['Tables']['email_recipients']['Row']
+export type EmailSubscriber = Database['public']['Tables']['email_subscribers']['Row']

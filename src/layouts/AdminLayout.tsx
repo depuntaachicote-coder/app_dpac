@@ -6,6 +6,7 @@ import {
   Users,
   Image,
   Share2,
+  Mail,
   LogOut,
   Menu,
   X,
@@ -21,6 +22,7 @@ const navItems = [
   { icon: Users, label: 'Usuarios', path: '/admin/usuarios' },
   { icon: Image, label: 'Media', path: '/admin/media' },
   { icon: Share2, label: 'Redes Sociales', path: '/admin/social' },
+  { icon: Mail, label: 'Email Marketing', path: '/admin/email-marketing' },
 ]
 
 export default function AdminLayout() {
@@ -29,8 +31,15 @@ export default function AdminLayout() {
   const navigate = useNavigate()
 
   const handleSignOut = async () => {
-    await signOut()
-    navigate('/')
+    try {
+      await signOut()
+      // Force navigation after signOut completes
+      navigate('/', { replace: true })
+    } catch (error) {
+      console.error('Error signing out:', error)
+      // Force navigation even on error
+      navigate('/', { replace: true })
+    }
   }
 
   return (

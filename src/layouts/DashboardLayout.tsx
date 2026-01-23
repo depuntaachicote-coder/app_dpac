@@ -28,8 +28,13 @@ export default function DashboardLayout() {
   const navigate = useNavigate()
 
   const handleSignOut = async () => {
-    await signOut()
-    navigate('/')
+    try {
+      await signOut()
+      navigate('/', { replace: true })
+    } catch (error) {
+      console.error('Error signing out:', error)
+      navigate('/', { replace: true })
+    }
   }
 
   return (

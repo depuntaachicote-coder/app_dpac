@@ -189,27 +189,30 @@ export default function PropertyDetail() {
                 {property.name}
               </h1>
 
-              {/* Ratings */}
-              <div className="mt-6 flex items-center gap-6">
-                <div className="flex items-center gap-2">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <Star
-                      key={i}
-                      size={20}
-                      className={
-                        i < Math.round(averageRating)
-                          ? 'fill-primary-900 text-primary-900'
-                          : 'text-primary-300'
-                      }
-                    />
-                  ))}
-                  <span className="ml-2 text-lg font-medium text-primary-900">
-                    {averageRating.toFixed(1)}
-                  </span>
+              {/* Ratings - Solo mostrar si hay valoraciones */}
+              {ratings.length > 0 && (
+                <div className="mt-6 flex items-center gap-6">
+                  <div className="flex items-center gap-2">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <Star
+                        key={i}
+                        size={20}
+                        className={
+                          i < Math.round(averageRating)
+                            ? 'fill-primary-900 text-primary-900'
+                            : 'text-primary-300'
+                        }
+                      />
+                    ))}
+                    <span className="ml-2 text-lg font-medium text-primary-900">
+                      {averageRating.toFixed(1)}
+                    </span>
+                  </div>
                 </div>
-              </div>
+              )}
 
-              {/* Platform Ratings */}
+              {/* Platform Ratings - Solo mostrar si hay al menos una valoracion */}
+              {(property.google_rating || property.booking_rating || property.airbnb_rating) && (
               <div className="mt-6 flex flex-wrap gap-4">
                 {property.google_rating && (
                   <div className="px-4 py-2 bg-primary-50 border border-primary-200">
@@ -251,6 +254,7 @@ export default function PropertyDetail() {
                   </div>
                 )}
               </div>
+              )}
 
               {/* Description */}
               {property.description && (

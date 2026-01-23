@@ -6,8 +6,12 @@ import {
   MapPin,
   Star,
   Image as ImageIcon,
+  RefreshCw,
+  ExternalLink,
+  AlertCircle,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../context/AuthContext'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 
 const propertyTypes = ['Hotel', 'Casa Rural', 'Apartamento', 'Hostal', 'Pazo', 'Otro']
@@ -16,6 +20,7 @@ const provinces = ['A Coruña', 'Lugo', 'Ourense', 'Pontevedra']
 export default function AdminPropertyEdit() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { isAdmin } = useAuth()
   const isEditing = Boolean(id)
 
   const [loading, setLoading] = useState(isEditing)
@@ -32,10 +37,14 @@ export default function AdminPropertyEdit() {
     postal_code: '',
     latitude: '',
     longitude: '',
+    google_place_id: '',
+    google_maps_url: '',
     google_rating: '',
     google_reviews_count: '',
+    booking_url: '',
     booking_rating: '',
     booking_reviews_count: '',
+    airbnb_url: '',
     airbnb_rating: '',
     airbnb_reviews_count: '',
     property_type: 'Casa Rural',
@@ -45,6 +54,14 @@ export default function AdminPropertyEdit() {
     is_active: true,
     ranking_position: '',
   })
+
+  const [fetchingRatings, setFetchingRatings] = useState<{
+    google: boolean
+    booking: boolean
+    airbnb: boolean
+  }>({ google: false, booking: false, airbnb: false })
+  const [fetchError, setFetchError] = useState<string | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   useEffect(() => {
     if (isEditing && id) {
@@ -75,10 +92,14 @@ export default function AdminPropertyEdit() {
           postal_code: string | null
           latitude: number | null
           longitude: number | null
+          google_place_id: string | null
+          google_maps_url: string | null
           google_rating: number | null
           google_reviews_count: number | null
+          booking_url: string | null
           booking_rating: number | null
           booking_reviews_count: number | null
+          airbnb_url: string | null
           airbnb_rating: number | null
           airbnb_reviews_count: number | null
           property_type: string
@@ -99,10 +120,14 @@ export default function AdminPropertyEdit() {
           postal_code: prop.postal_code || '',
           latitude: prop.latitude?.toString() || '',
           longitude: prop.longitude?.toString() || '',
+          google_place_id: prop.google_place_id || '',
+          google_maps_url: prop.google_maps_url || '',
           google_rating: prop.google_rating?.toString() || '',
           google_reviews_count: prop.google_reviews_count?.toString() || '',
+          booking_url: prop.booking_url || '',
           booking_rating: prop.booking_rating?.toString() || '',
           booking_reviews_count: prop.booking_reviews_count?.toString() || '',
+          airbnb_url: prop.airbnb_url || '',
           airbnb_rating: prop.airbnb_rating?.toString() || '',
           airbnb_reviews_count: prop.airbnb_reviews_count?.toString() || '',
           property_type: prop.property_type,
@@ -150,12 +175,47 @@ export default function AdminPropertyEdit() {
     }))
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setSaving(true)
+  // Fetch Google ratings using Places API
+  const fetchGoogleRatings = async () => {
+    setFetchingRatings((prev) => ({ ...prev, google: true }))
+    setFetchError(null)
 
     try {
-      const propertyData = {
+      // For now, we show a message that API key is needed
+      // In production, this would call a Supabase Edge Function
+      setFetchError(
+        'Para obtener valoraciones automaticas de Google, configura GOOGLE_PLACES_API_KEY en las variables de entorno de Supabase Edge Functions.'
+      )
+    } catch (error) {
+      console.error('Error fetching Google ratings:', error)
+      setFetchError('Error al obtener valoraciones de Google')
+    } finally {
+      setFetchingRatings((prev) => ({ ...prev, google: false }))
+    }
+  }
+
+  // Open platform URL in new tab
+  const openPlatformUrl = (url: string) => {
+    if (url) {
+      window.open(url, '_blank', 'noopener,noreferrer')
+    }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    // Verificar que el usuario es admin antes de intentar guardar
+    if (!isAdmin) {
+      setSaveError('No tienes permisos de administrador para crear propiedades')
+      return
+    }
+
+    setSaving(true)
+    setSaveError(null)
+
+    try {
+      // Base property data (campos que siempre existen)
+      const propertyData: Record<string, unknown> = {
         name: formData.name,
         slug: formData.slug || generateSlug(formData.name),
         description: formData.description || null,
@@ -188,6 +248,12 @@ export default function AdminPropertyEdit() {
           : null,
       }
 
+      // Agregar campos de URL solo si tienen valor (para compatibilidad con BD sin migracion)
+      if (formData.google_place_id) propertyData.google_place_id = formData.google_place_id
+      if (formData.google_maps_url) propertyData.google_maps_url = formData.google_maps_url
+      if (formData.booking_url) propertyData.booking_url = formData.booking_url
+      if (formData.airbnb_url) propertyData.airbnb_url = formData.airbnb_url
+
       // Calculate overall score
       const ratings = [
         propertyData.google_rating,
@@ -215,6 +281,8 @@ export default function AdminPropertyEdit() {
       navigate('/admin/propiedades')
     } catch (error) {
       console.error('Error saving property:', error)
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      setSaveError(`Error al guardar: ${errorMessage}`)
     } finally {
       setSaving(false)
     }
@@ -246,6 +314,14 @@ export default function AdminPropertyEdit() {
 
       {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-8">
+        {/* Error Message */}
+        {saveError && (
+          <div className="p-4 bg-red-50 border border-red-200 flex items-start gap-3">
+            <AlertCircle size={20} className="text-red-600 flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-red-800 font-medium">{saveError}</p>
+          </div>
+        )}
+
         {/* Basic Info */}
         <div className="bg-white border border-primary-200 p-6">
           <h2 className="font-display text-xl font-semibold text-primary-900 mb-6">
@@ -422,92 +498,201 @@ export default function AdminPropertyEdit() {
             <Star size={20} />
             Valoraciones
           </h2>
+
+          {fetchError && (
+            <div className="mb-6 p-4 bg-amber-50 border border-amber-200 flex items-start gap-3">
+              <AlertCircle size={20} className="text-amber-600 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-amber-800">{fetchError}</p>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Google */}
-            <div className="space-y-4">
-              <h3 className="font-medium text-primary-800">Google Maps</h3>
+            <div className="space-y-4 p-4 border border-primary-100 rounded-lg">
+              <div className="flex items-center justify-between">
+                <h3 className="font-medium text-primary-800">Google Maps</h3>
+                {formData.google_maps_url && (
+                  <button
+                    type="button"
+                    onClick={() => openPlatformUrl(formData.google_maps_url)}
+                    className="p-1 text-primary-500 hover:text-primary-700"
+                    title="Abrir en Google Maps"
+                  >
+                    <ExternalLink size={16} />
+                  </button>
+                )}
+              </div>
               <div>
-                <label className="block text-sm text-primary-600 mb-1">Puntuación</label>
+                <label className="block text-sm text-primary-600 mb-1">URL de Google Maps</label>
                 <input
-                  type="number"
-                  name="google_rating"
-                  value={formData.google_rating}
+                  type="url"
+                  name="google_maps_url"
+                  value={formData.google_maps_url}
                   onChange={handleChange}
-                  min="0"
-                  max="5"
-                  step="0.1"
-                  className="w-full px-4 py-2 border border-primary-200 focus:border-primary-900 focus:outline-none"
+                  placeholder="https://maps.google.com/..."
+                  className="w-full px-3 py-2 text-sm border border-primary-200 focus:border-primary-900 focus:outline-none"
                 />
               </div>
               <div>
-                <label className="block text-sm text-primary-600 mb-1">Nº reseñas</label>
+                <label className="block text-sm text-primary-600 mb-1">Place ID (opcional)</label>
                 <input
-                  type="number"
-                  name="google_reviews_count"
-                  value={formData.google_reviews_count}
+                  type="text"
+                  name="google_place_id"
+                  value={formData.google_place_id}
                   onChange={handleChange}
-                  min="0"
-                  className="w-full px-4 py-2 border border-primary-200 focus:border-primary-900 focus:outline-none"
+                  placeholder="ChIJ..."
+                  className="w-full px-3 py-2 text-sm border border-primary-200 focus:border-primary-900 focus:outline-none"
                 />
               </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm text-primary-600 mb-1">Puntuacion</label>
+                  <input
+                    type="number"
+                    name="google_rating"
+                    value={formData.google_rating}
+                    onChange={handleChange}
+                    min="0"
+                    max="5"
+                    step="0.1"
+                    className="w-full px-3 py-2 border border-primary-200 focus:border-primary-900 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-primary-600 mb-1">Reseñas</label>
+                  <input
+                    type="number"
+                    name="google_reviews_count"
+                    value={formData.google_reviews_count}
+                    onChange={handleChange}
+                    min="0"
+                    className="w-full px-3 py-2 border border-primary-200 focus:border-primary-900 focus:outline-none"
+                  />
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={fetchGoogleRatings}
+                disabled={fetchingRatings.google || !formData.google_maps_url}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm bg-primary-100 text-primary-700 hover:bg-primary-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <RefreshCw size={14} className={fetchingRatings.google ? 'animate-spin' : ''} />
+                Actualizar desde Google
+              </button>
             </div>
 
             {/* Booking */}
-            <div className="space-y-4">
-              <h3 className="font-medium text-primary-800">Booking</h3>
-              <div>
-                <label className="block text-sm text-primary-600 mb-1">Puntuación</label>
-                <input
-                  type="number"
-                  name="booking_rating"
-                  value={formData.booking_rating}
-                  onChange={handleChange}
-                  min="0"
-                  max="10"
-                  step="0.1"
-                  className="w-full px-4 py-2 border border-primary-200 focus:border-primary-900 focus:outline-none"
-                />
+            <div className="space-y-4 p-4 border border-primary-100 rounded-lg">
+              <div className="flex items-center justify-between">
+                <h3 className="font-medium text-primary-800">Booking</h3>
+                {formData.booking_url && (
+                  <button
+                    type="button"
+                    onClick={() => openPlatformUrl(formData.booking_url)}
+                    className="p-1 text-primary-500 hover:text-primary-700"
+                    title="Abrir en Booking"
+                  >
+                    <ExternalLink size={16} />
+                  </button>
+                )}
               </div>
               <div>
-                <label className="block text-sm text-primary-600 mb-1">Nº reseñas</label>
+                <label className="block text-sm text-primary-600 mb-1">URL de Booking</label>
                 <input
-                  type="number"
-                  name="booking_reviews_count"
-                  value={formData.booking_reviews_count}
+                  type="url"
+                  name="booking_url"
+                  value={formData.booking_url}
                   onChange={handleChange}
-                  min="0"
-                  className="w-full px-4 py-2 border border-primary-200 focus:border-primary-900 focus:outline-none"
+                  placeholder="https://booking.com/hotel/..."
+                  className="w-full px-3 py-2 text-sm border border-primary-200 focus:border-primary-900 focus:outline-none"
                 />
               </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm text-primary-600 mb-1">Puntuacion</label>
+                  <input
+                    type="number"
+                    name="booking_rating"
+                    value={formData.booking_rating}
+                    onChange={handleChange}
+                    min="0"
+                    max="10"
+                    step="0.1"
+                    className="w-full px-3 py-2 border border-primary-200 focus:border-primary-900 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-primary-600 mb-1">Reseñas</label>
+                  <input
+                    type="number"
+                    name="booking_reviews_count"
+                    value={formData.booking_reviews_count}
+                    onChange={handleChange}
+                    min="0"
+                    className="w-full px-3 py-2 border border-primary-200 focus:border-primary-900 focus:outline-none"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-primary-400">
+                Introduce las valoraciones manualmente desde el enlace
+              </p>
             </div>
 
             {/* Airbnb */}
-            <div className="space-y-4">
-              <h3 className="font-medium text-primary-800">Airbnb</h3>
-              <div>
-                <label className="block text-sm text-primary-600 mb-1">Puntuación</label>
-                <input
-                  type="number"
-                  name="airbnb_rating"
-                  value={formData.airbnb_rating}
-                  onChange={handleChange}
-                  min="0"
-                  max="5"
-                  step="0.1"
-                  className="w-full px-4 py-2 border border-primary-200 focus:border-primary-900 focus:outline-none"
-                />
+            <div className="space-y-4 p-4 border border-primary-100 rounded-lg">
+              <div className="flex items-center justify-between">
+                <h3 className="font-medium text-primary-800">Airbnb</h3>
+                {formData.airbnb_url && (
+                  <button
+                    type="button"
+                    onClick={() => openPlatformUrl(formData.airbnb_url)}
+                    className="p-1 text-primary-500 hover:text-primary-700"
+                    title="Abrir en Airbnb"
+                  >
+                    <ExternalLink size={16} />
+                  </button>
+                )}
               </div>
               <div>
-                <label className="block text-sm text-primary-600 mb-1">Nº reseñas</label>
+                <label className="block text-sm text-primary-600 mb-1">URL de Airbnb</label>
                 <input
-                  type="number"
-                  name="airbnb_reviews_count"
-                  value={formData.airbnb_reviews_count}
+                  type="url"
+                  name="airbnb_url"
+                  value={formData.airbnb_url}
                   onChange={handleChange}
-                  min="0"
-                  className="w-full px-4 py-2 border border-primary-200 focus:border-primary-900 focus:outline-none"
+                  placeholder="https://airbnb.com/rooms/..."
+                  className="w-full px-3 py-2 text-sm border border-primary-200 focus:border-primary-900 focus:outline-none"
                 />
               </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm text-primary-600 mb-1">Puntuacion</label>
+                  <input
+                    type="number"
+                    name="airbnb_rating"
+                    value={formData.airbnb_rating}
+                    onChange={handleChange}
+                    min="0"
+                    max="5"
+                    step="0.1"
+                    className="w-full px-3 py-2 border border-primary-200 focus:border-primary-900 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-primary-600 mb-1">Reseñas</label>
+                  <input
+                    type="number"
+                    name="airbnb_reviews_count"
+                    value={formData.airbnb_reviews_count}
+                    onChange={handleChange}
+                    min="0"
+                    className="w-full px-3 py-2 border border-primary-200 focus:border-primary-900 focus:outline-none"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-primary-400">
+                Introduce las valoraciones manualmente desde el enlace
+              </p>
             </div>
           </div>
         </div>

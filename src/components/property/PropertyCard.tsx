@@ -72,24 +72,28 @@ export default function PropertyCard({ property, rank, showRank = true }: Proper
             </p>
           )}
 
-          {/* Ratings */}
+          {/* Ratings - Solo mostrar si hay valoraciones o tipo de propiedad */}
           <div className="mt-4 flex items-center justify-between">
-            <div className="flex items-center gap-1">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Star
-                  key={i}
-                  size={16}
-                  className={
-                    i < Math.round(averageRating)
-                      ? 'fill-primary-900 text-primary-900'
-                      : 'text-primary-300'
-                  }
-                />
-              ))}
-              <span className="ml-2 text-sm font-medium text-primary-900">
-                {averageRating.toFixed(1)}
-              </span>
-            </div>
+            {ratings.length > 0 ? (
+              <div className="flex items-center gap-1">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Star
+                    key={i}
+                    size={16}
+                    className={
+                      i < Math.round(averageRating)
+                        ? 'fill-primary-900 text-primary-900'
+                        : 'text-primary-300'
+                    }
+                  />
+                ))}
+                <span className="ml-2 text-sm font-medium text-primary-900">
+                  {averageRating.toFixed(1)}
+                </span>
+              </div>
+            ) : (
+              <div /> // Placeholder para mantener flex justify-between
+            )}
 
             {property.property_type && (
               <span className="text-xs px-2 py-1 bg-primary-100 text-primary-600">
@@ -98,27 +102,29 @@ export default function PropertyCard({ property, rank, showRank = true }: Proper
             )}
           </div>
 
-          {/* Platform ratings */}
-          <div className="mt-4 pt-4 border-t border-primary-100 flex items-center gap-4 text-xs text-primary-500">
-            {property.google_rating && (
-              <div className="flex items-center gap-1">
-                <span className="font-medium">Google:</span>
-                <span>{property.google_rating}</span>
-              </div>
-            )}
-            {property.booking_rating && (
-              <div className="flex items-center gap-1">
-                <span className="font-medium">Booking:</span>
-                <span>{property.booking_rating}</span>
-              </div>
-            )}
-            {property.airbnb_rating && (
-              <div className="flex items-center gap-1">
-                <span className="font-medium">Airbnb:</span>
-                <span>{property.airbnb_rating}</span>
-              </div>
-            )}
-          </div>
+          {/* Platform ratings - Solo mostrar si hay al menos una valoracion */}
+          {(property.google_rating || property.booking_rating || property.airbnb_rating) && (
+            <div className="mt-4 pt-4 border-t border-primary-100 flex items-center gap-4 text-xs text-primary-500">
+              {property.google_rating && (
+                <div className="flex items-center gap-1">
+                  <span className="font-medium">Google:</span>
+                  <span>{property.google_rating}</span>
+                </div>
+              )}
+              {property.booking_rating && (
+                <div className="flex items-center gap-1">
+                  <span className="font-medium">Booking:</span>
+                  <span>{property.booking_rating}</span>
+                </div>
+              )}
+              {property.airbnb_rating && (
+                <div className="flex items-center gap-1">
+                  <span className="font-medium">Airbnb:</span>
+                  <span>{property.airbnb_rating}</span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </motion.article>
     </Link>
