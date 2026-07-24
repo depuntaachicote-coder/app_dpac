@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Navigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -224,11 +224,10 @@ export default function UserMedia() {
     } catch {}
   }
 
-  const downloadAll = async () => {
-    for (const item of availableItems) {
-      await downloadFile(getDownloadUrl(item), item.file_name)
-    }
-  }
+  const [downloadingAll, setDownloadingAll] = useState(false)
+  const [downloadProgress, setDownloadProgress] = useState(0)
+  // Ref so downloadAll always has the current displayItems without stale closure
+  const displayItemsRef = useRef<Media[]>([])
 
   // Auto-abre el carrito flotante al añadir el primer archivo
   useEffect(() => {
@@ -310,6 +309,22 @@ export default function UserMedia() {
     activeTab === 'image' ? images :
     activeTab === 'video' ? videos :
     availableItems
+
+  // Keep ref updated so downloadAll always reads the latest displayItems
+  displayItemsRef.current = displayItems
+
+  const downloadAll = async () => {
+    const items = displayItemsRef.current
+    if (!items.length || downloadingAll) return
+    setDownloadingAll(true)
+    setDownloadProgress(0)
+    for (let i = 0; i < items.length; i++) {
+      await downloadFile(getDownloadUrl(items[i]), items[i].file_name)
+      setDownloadProgress(i + 1)
+    }
+    setDownloadingAll(false)
+    setDownloadProgress(0)
+  }
 
   return (
     <div className="space-y-6">
@@ -459,15 +474,6 @@ export default function UserMedia() {
             </button>
           )}
 
-          {availableItems.length > 0 && (
-            <button
-              onClick={downloadAll}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary-900 text-white text-sm font-medium hover:bg-primary-800 transition-colors"
-            >
-              <Download size={18} />
-              Descargar todo
-            </button>
-          )}
         </div>
       </div>
 
@@ -556,13 +562,36 @@ export default function UserMedia() {
           )}
         </div>
 
-        <div className="flex border border-primary-200 bg-white">
-          <button onClick={() => setViewMode('grid')} className={`p-2 transition-colors ${viewMode === 'grid' ? 'bg-primary-900 text-white' : 'text-primary-600 hover:bg-primary-50'}`}>
-            <Grid size={20} />
-          </button>
-          <button onClick={() => setViewMode('list')} className={`p-2 transition-colors ${viewMode === 'list' ? 'bg-primary-900 text-white' : 'text-primary-600 hover:bg-primary-50'}`}>
-            <List size={20} />
-          </button>
+        <div className="flex items-center gap-2">
+          {/* Download all — only for non-buy tabs with items */}
+          {activeTab !== 'buy' && displayItems.length > 0 && (
+            <button
+              onClick={downloadAll}
+              disabled={downloadingAll}
+              className="inline-flex items-center gap-2 px-4 py-2 border border-primary-200 bg-white text-primary-700 text-sm font-medium hover:bg-primary-50 transition-colors disabled:opacity-60 disabled:cursor-wait"
+            >
+              {downloadingAll ? (
+                <>
+                  <Loader size={15} className="animate-spin" />
+                  {downloadProgress}/{displayItems.length}
+                </>
+              ) : (
+                <>
+                  <Download size={15} />
+                  Descargar todas
+                </>
+              )}
+            </button>
+          )}
+
+          <div className="flex border border-primary-200 bg-white">
+            <button onClick={() => setViewMode('grid')} className={`p-2 transition-colors ${viewMode === 'grid' ? 'bg-primary-900 text-white' : 'text-primary-600 hover:bg-primary-50'}`}>
+              <Grid size={20} />
+            </button>
+            <button onClick={() => setViewMode('list')} className={`p-2 transition-colors ${viewMode === 'list' ? 'bg-primary-900 text-white' : 'text-primary-600 hover:bg-primary-50'}`}>
+              <List size={20} />
+            </button>
+          </div>
         </div>
       </div>
 
