@@ -9,6 +9,9 @@ import {
   Printer,
   ShoppingBag,
   FileText,
+  Send,
+  ClipboardList,
+  Loader,
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { supabase } from '../../lib/supabase'
@@ -169,6 +172,58 @@ export default function UserInvoices() {
   const [loading, setLoading] = useState(true)
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null)
 
+  // ── Solicitar factura ───────────────────────────────────────────────────────
+  const [requestModal, setRequestModal] = useState<Invoice | null>(null)
+  const [requestForm, setRequestForm] = useState({
+    razonSocial: '', nif: '', direccion: '', cp: '', ciudad: '', email: '',
+  })
+  const [requestSending, setRequestSending] = useState(false)
+  const [requestSuccess, setRequestSuccess] = useState(false)
+
+  const hasFacturaRequested = (inv: Invoice) =>
+    typeof inv.notes === 'string' && inv.notes.includes('[FACTURA_SOLICITADA]')
+
+  const openRequestModal = (inv: Invoice, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setRequestModal(inv)
+    setRequestSuccess(false)
+    setRequestForm({
+      razonSocial: profile?.full_name ?? '',
+      nif: '',
+      direccion: '',
+      cp: '',
+      ciudad: '',
+      email: profile?.email ?? '',
+    })
+  }
+
+  const submitInvoiceRequest = async () => {
+    if (!requestModal) return
+    const { razonSocial, nif, direccion, cp, ciudad, email } = requestForm
+    if (!razonSocial.trim() || !nif.trim() || !email.trim()) return
+    setRequestSending(true)
+    try {
+      const fiscalBlock = [
+        '[FACTURA_SOLICITADA]',
+        `Razón Social: ${razonSocial}`,
+        `NIF/CIF: ${nif}`,
+        `Dirección: ${direccion}`,
+        `CP y Ciudad: ${cp} ${ciudad}`,
+        `Email: ${email}`,
+      ].join('\n')
+      const prevNotes = requestModal.notes ?? ''
+      await supabase
+        .from('invoices')
+        .update({ notes: prevNotes ? `${prevNotes}\n\n${fiscalBlock}` : fiscalBlock } as never)
+        .eq('id', requestModal.id)
+      setRequestSuccess(true)
+      await fetchInvoices()
+    } catch {
+    } finally {
+      setRequestSending(false)
+    }
+  }
+
   useEffect(() => {
     if (profile?.id) fetchInvoices()
   }, [profile?.id])
@@ -268,18 +323,34 @@ export default function UserInvoices() {
                     </div>
                   </div>
 
-                  <div className="text-right flex-shrink-0">
+                  <div className="text-right flex-shrink-0 space-y-2">
                     <p className="text-xl font-bold text-primary-900">{fmt(invoice.total)}</p>
+
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
                         printReceipt(invoice, profile?.full_name ?? '', profile?.email ?? '')
                       }}
-                      className="mt-2 text-sm text-primary-500 hover:text-primary-900 flex items-center gap-1 ml-auto transition-colors"
+                      className="text-sm text-primary-500 hover:text-primary-900 flex items-center gap-1 ml-auto transition-colors"
                     >
                       <Printer size={13} />
                       Imprimir / PDF
                     </button>
+
+                    {hasFacturaRequested(invoice) ? (
+                      <span className="flex items-center gap-1 text-[11px] font-semibold text-blue-700 ml-auto justify-end">
+                        <Check size={11} />
+                        Factura solicitada
+                      </span>
+                    ) : (
+                      <button
+                        onClick={(e) => openRequestModal(invoice, e)}
+                        className="flex items-center gap-1 text-[12px] font-semibold text-primary-700 hover:text-primary-900 ml-auto transition-colors border border-primary-200 px-2 py-1 hover:bg-primary-50"
+                      >
+                        <ClipboardList size={12} />
+                        Solicitar factura
+                      </button>
+                    )}
                   </div>
                 </div>
               </motion.div>
@@ -467,6 +538,194 @@ export default function UserInvoices() {
                   </button>
                 </div>
               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Solicitar factura modal ─────────────────────────────────────────── */}
+      <AnimatePresence>
+        {requestModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+            onClick={() => { if (!requestSending) setRequestModal(null) }}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96 }}
+              transition={{ type: 'spring', stiffness: 350, damping: 28 }}
+              className="bg-white w-full max-w-lg shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-primary-200">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-primary-100 rounded-lg">
+                    <ClipboardList size={18} className="text-primary-700" />
+                  </div>
+                  <div>
+                    <h3 className="font-display text-lg font-bold text-primary-900">Solicitar factura</h3>
+                    <p className="text-xs text-primary-500 font-mono">{requestModal.invoice_number}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setRequestModal(null)}
+                  disabled={requestSending}
+                  className="p-2 text-primary-400 hover:text-primary-900 transition-colors disabled:opacity-40"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {requestSuccess ? (
+                /* ── Confirmation ── */
+                <div className="px-6 py-10 text-center space-y-4">
+                  <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+                    <Check size={28} className="text-green-600" />
+                  </div>
+                  <div>
+                    <p className="font-display text-xl font-bold text-primary-900">¡Solicitud enviada!</p>
+                    <p className="text-sm text-primary-600 mt-2 leading-relaxed">
+                      Hemos recibido tu solicitud de factura. Recibirás el documento
+                      en un plazo máximo de <strong>48 horas hábiles</strong> en el email indicado.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setRequestModal(null)}
+                    className="mt-2 px-6 py-2.5 bg-primary-900 text-white text-sm font-medium hover:bg-primary-800 transition-colors"
+                  >
+                    Cerrar
+                  </button>
+                </div>
+              ) : (
+                /* ── Form ── */
+                <div className="px-6 py-5 space-y-4">
+                  <p className="text-sm text-primary-600">
+                    Introduce tus datos fiscales y te enviaremos la factura oficial con IVA desglosado.
+                  </p>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* Razón Social — full width */}
+                    <div className="col-span-2">
+                      <label className="block text-xs font-semibold text-primary-700 uppercase tracking-wider mb-1.5">
+                        Nombre / Razón Social <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={requestForm.razonSocial}
+                        onChange={(e) => setRequestForm(f => ({ ...f, razonSocial: e.target.value }))}
+                        placeholder="EMPRESA S.L. o Nombre Apellidos"
+                        className="w-full border border-primary-200 px-3 py-2.5 text-sm text-primary-900 focus:outline-none focus:border-primary-900 transition-colors"
+                      />
+                    </div>
+
+                    {/* NIF/CIF */}
+                    <div>
+                      <label className="block text-xs font-semibold text-primary-700 uppercase tracking-wider mb-1.5">
+                        NIF / CIF <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={requestForm.nif}
+                        onChange={(e) => setRequestForm(f => ({ ...f, nif: e.target.value }))}
+                        placeholder="B12345678 / 12345678A"
+                        className="w-full border border-primary-200 px-3 py-2.5 text-sm text-primary-900 focus:outline-none focus:border-primary-900 transition-colors"
+                      />
+                    </div>
+
+                    {/* Email */}
+                    <div>
+                      <label className="block text-xs font-semibold text-primary-700 uppercase tracking-wider mb-1.5">
+                        Email de envío <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="email"
+                        value={requestForm.email}
+                        onChange={(e) => setRequestForm(f => ({ ...f, email: e.target.value }))}
+                        placeholder="facturacion@empresa.com"
+                        className="w-full border border-primary-200 px-3 py-2.5 text-sm text-primary-900 focus:outline-none focus:border-primary-900 transition-colors"
+                      />
+                    </div>
+
+                    {/* Dirección — full width */}
+                    <div className="col-span-2">
+                      <label className="block text-xs font-semibold text-primary-700 uppercase tracking-wider mb-1.5">
+                        Dirección fiscal
+                      </label>
+                      <input
+                        type="text"
+                        value={requestForm.direccion}
+                        onChange={(e) => setRequestForm(f => ({ ...f, direccion: e.target.value }))}
+                        placeholder="Calle Mayor, 1, 2ºA"
+                        className="w-full border border-primary-200 px-3 py-2.5 text-sm text-primary-900 focus:outline-none focus:border-primary-900 transition-colors"
+                      />
+                    </div>
+
+                    {/* CP */}
+                    <div>
+                      <label className="block text-xs font-semibold text-primary-700 uppercase tracking-wider mb-1.5">
+                        Código postal
+                      </label>
+                      <input
+                        type="text"
+                        value={requestForm.cp}
+                        onChange={(e) => setRequestForm(f => ({ ...f, cp: e.target.value }))}
+                        placeholder="28001"
+                        className="w-full border border-primary-200 px-3 py-2.5 text-sm text-primary-900 focus:outline-none focus:border-primary-900 transition-colors"
+                      />
+                    </div>
+
+                    {/* Ciudad */}
+                    <div>
+                      <label className="block text-xs font-semibold text-primary-700 uppercase tracking-wider mb-1.5">
+                        Ciudad / Municipio
+                      </label>
+                      <input
+                        type="text"
+                        value={requestForm.ciudad}
+                        onChange={(e) => setRequestForm(f => ({ ...f, ciudad: e.target.value }))}
+                        placeholder="Madrid"
+                        className="w-full border border-primary-200 px-3 py-2.5 text-sm text-primary-900 focus:outline-none focus:border-primary-900 transition-colors"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Info box */}
+                  <div className="bg-primary-50 border border-primary-200 p-3 flex gap-2.5">
+                    <Receipt size={15} className="text-primary-500 flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-primary-600 leading-relaxed">
+                      La factura será emitida por <strong>GRUPO NORAN HOMES S.L.</strong> (De Punta a Chicote)
+                      e incluirá el desglose de IVA. Te la enviaremos en un plazo de 48&nbsp;h hábiles.
+                    </p>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex justify-end gap-3 pt-1">
+                    <button
+                      onClick={() => setRequestModal(null)}
+                      disabled={requestSending}
+                      className="px-5 py-2.5 border border-primary-200 text-primary-700 text-sm hover:bg-primary-50 transition-colors disabled:opacity-40"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={submitInvoiceRequest}
+                      disabled={requestSending || !requestForm.razonSocial.trim() || !requestForm.nif.trim() || !requestForm.email.trim()}
+                      className="px-5 py-2.5 bg-primary-900 text-white text-sm font-medium hover:bg-primary-800 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {requestSending ? (
+                        <><Loader size={15} className="animate-spin" />Enviando…</>
+                      ) : (
+                        <><Send size={15} />Solicitar factura</>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
             </motion.div>
           </motion.div>
         )}
