@@ -190,6 +190,7 @@ export default function UserInvoices() {
     e.stopPropagation()
     setRequestModal(inv)
     setRequestSuccess(false)
+    setRequestError(null)
     setRequestForm({
       razonSocial: profile?.full_name ?? '',
       nif: '',
@@ -200,11 +201,14 @@ export default function UserInvoices() {
     })
   }
 
+  const [requestError, setRequestError] = useState<string | null>(null)
+
   const submitInvoiceRequest = async () => {
     if (!requestModal) return
     const { razonSocial, nif, direccion, cp, ciudad, email } = requestForm
     if (!razonSocial.trim() || !nif.trim() || !email.trim()) return
     setRequestSending(true)
+    setRequestError(null)
     try {
       const fiscalBlock = [
         '[FACTURA_SOLICITADA]',
@@ -215,13 +219,19 @@ export default function UserInvoices() {
         `Email: ${email}`,
       ].join('\n')
       const prevNotes = requestModal.notes ?? ''
-      await supabase
+      const newNotes = prevNotes ? `${prevNotes}\n\n${fiscalBlock}` : fiscalBlock
+      const { error: updateError } = await supabase
         .from('invoices')
-        .update({ notes: prevNotes ? `${prevNotes}\n\n${fiscalBlock}` : fiscalBlock } as never)
+        .update({ notes: newNotes } as never)
         .eq('id', requestModal.id)
+      if (updateError) {
+        setRequestError('No se pudo guardar la solicitud. Comprueba tu conexión e inténtalo de nuevo.')
+        return
+      }
       setRequestSuccess(true)
       await fetchInvoices()
     } catch {
+      setRequestError('Error inesperado al enviar la solicitud.')
     } finally {
       setRequestSending(false)
     }
@@ -710,6 +720,12 @@ export default function UserInvoices() {
                       e incluirá el desglose de IVA. Te la enviaremos en un plazo de 48&nbsp;h hábiles.
                     </p>
                   </div>
+
+                  {requestError && (
+                    <div className="bg-red-50 border border-red-200 text-red-700 p-3 text-xs">
+                      {requestError}
+                    </div>
+                  )}
 
                   {/* Actions */}
                   <div className="flex justify-end gap-3 pt-1">
