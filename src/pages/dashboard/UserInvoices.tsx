@@ -1,27 +1,168 @@
 import { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   Receipt,
   Calendar,
   Check,
-  AlertCircle,
-  Clock,
   Download,
   X,
+  Printer,
+  ShoppingBag,
+  FileText,
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { supabase } from '../../lib/supabase'
 import type { Invoice } from '../../types/database'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 
-const statusConfig = {
-  draft: { label: 'Borrador', color: 'bg-gray-100 text-gray-700', icon: Receipt },
-  sent: { label: 'Pendiente', color: 'bg-blue-100 text-blue-700', icon: Clock },
-  paid: { label: 'Pagada', color: 'bg-green-100 text-green-700', icon: Check },
-  overdue: { label: 'Vencida', color: 'bg-red-100 text-red-700', icon: AlertCircle },
-  cancelled: { label: 'Cancelada', color: 'bg-gray-100 text-gray-700', icon: X },
+// ── Company data ──────────────────────────────────────────────────────────────
+const COMPANY = {
+  name: 'GRUPO NORAN HOMES S.L.',
+  brand: 'De Punta a Chicote',
+  address: 'Av. Orense, 47, 4ºC',
+  city: '36900 Marín, Pontevedra',
+  email: 'hola@depuntaachicote.com',
+  cif: 'B27619410',
+  ivaRate: 21,
 }
 
+type InvoiceItem = { description: string; quantity: number; price: number }
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const fmt = (amount: number) =>
+  new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(amount)
+
+const fmtDate = (date: string) =>
+  new Date(date).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
+
+// ── Print function ────────────────────────────────────────────────────────────
+function printReceipt(invoice: Invoice, clientName: string, clientEmail: string) {
+  const items = invoice.items as InvoiceItem[]
+
+  const rows = items.map((item) => `
+    <tr>
+      <td>${item.description}</td>
+      <td style="text-align:center">${item.quantity}</td>
+      <td style="text-align:right">${fmt(item.price)}</td>
+      <td style="text-align:right">${fmt(item.quantity * item.price)}</td>
+    </tr>`).join('')
+
+  const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Recibo ${invoice.invoice_number} — De Punta a Chicote</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Helvetica Neue',Arial,sans-serif;color:#111827;padding:48px;max-width:800px;margin:0 auto}
+  header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:48px;padding-bottom:32px;border-bottom:2px solid #0f172a}
+  .brand{font-size:22px;font-weight:800;color:#0f172a;letter-spacing:-0.5px}
+  .legal{font-size:11px;color:#64748b;margin-top:2px;font-weight:600;letter-spacing:0.03em}
+  .address{margin-top:12px;font-size:12.5px;color:#475569;line-height:1.8}
+  .receipt-meta{text-align:right}
+  .receipt-label{font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:#94a3b8;margin-bottom:4px}
+  .receipt-number{font-size:22px;font-weight:800;color:#0f172a}
+  .receipt-date{font-size:12px;color:#64748b;margin-top:8px;line-height:1.7}
+  .badge{display:inline-block;background:#dcfce7;color:#166534;padding:3px 10px;border-radius:3px;font-size:11px;font-weight:700;margin-top:10px;letter-spacing:0.04em}
+  .parties{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-bottom:36px}
+  .party-label{font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:#94a3b8;margin-bottom:8px;font-weight:600}
+  .party-name{font-size:14px;font-weight:700;color:#0f172a}
+  .party-info{font-size:12.5px;color:#475569;line-height:1.7;margin-top:4px}
+  table{width:100%;border-collapse:collapse;margin-bottom:0}
+  th{background:#0f172a;color:#fff;padding:10px 14px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;font-weight:600}
+  td{padding:12px 14px;border-bottom:1px solid #e2e8f0;font-size:13.5px;color:#1e293b}
+  tr:last-child td{border-bottom:none}
+  tr:nth-child(even) td{background:#f8fafc}
+  .totals-wrap{display:flex;justify-content:flex-end;margin-top:0;border-top:2px solid #e2e8f0}
+  .totals{width:280px;padding:20px 0 0}
+  .totals-row{display:flex;justify-content:space-between;padding:5px 0;font-size:13.5px;color:#475569}
+  .totals-divider{border-top:2px solid #0f172a;margin:10px 0}
+  .totals-total{display:flex;justify-content:space-between;font-weight:800;font-size:18px;color:#0f172a;padding-top:4px}
+  .footer{margin-top:48px;padding-top:20px;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8;line-height:1.6}
+  @media print{body{padding:20px}@page{margin:1cm}}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="brand">De Punta a Chicote</div>
+    <div class="legal">${COMPANY.name}</div>
+    <div class="address">
+      ${COMPANY.address}<br>
+      ${COMPANY.city}<br>
+      ${COMPANY.email}<br>
+      CIF: ${COMPANY.cif}
+    </div>
+  </div>
+  <div class="receipt-meta">
+    <div class="receipt-label">Recibo de compra</div>
+    <div class="receipt-number">${invoice.invoice_number}</div>
+    <div class="receipt-date">
+      Emitido: ${fmtDate(invoice.created_at)}<br>
+      ${invoice.paid_at ? `Pagado: ${fmtDate(invoice.paid_at)}` : ''}
+    </div>
+    <div><span class="badge">✓ PAGADO</span></div>
+  </div>
+</header>
+
+<div class="parties">
+  <div>
+    <div class="party-label">Emisor</div>
+    <div class="party-name">${COMPANY.name}</div>
+    <div class="party-info">
+      ${COMPANY.brand}<br>
+      ${COMPANY.address}<br>
+      ${COMPANY.city}<br>
+      CIF: ${COMPANY.cif}
+    </div>
+  </div>
+  <div>
+    <div class="party-label">Cliente</div>
+    <div class="party-name">${clientName || 'Cliente'}</div>
+    <div class="party-info">${clientEmail}</div>
+  </div>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Descripción</th>
+      <th style="text-align:center">Cantidad</th>
+      <th style="text-align:right">Precio unitario (sin IVA)</th>
+      <th style="text-align:right">Importe</th>
+    </tr>
+  </thead>
+  <tbody>${rows}</tbody>
+</table>
+
+<div class="totals-wrap">
+  <div class="totals">
+    <div class="totals-row"><span>Subtotal</span><span>${fmt(invoice.subtotal)}</span></div>
+    <div class="totals-row"><span>IVA (${invoice.tax_rate}%)</span><span>${fmt(invoice.tax_amount)}</span></div>
+    <div class="totals-divider"></div>
+    <div class="totals-total"><span>Total</span><span>${fmt(invoice.total)}</span></div>
+  </div>
+</div>
+
+<div class="footer">
+  Este documento acredita el pago realizado y sirve como comprobante de compra.
+  Conserve este recibo para sus registros contables.<br>
+  ${COMPANY.name} · ${COMPANY.brand} · ${COMPANY.address} · ${COMPANY.city} · CIF ${COMPANY.cif}
+</div>
+
+<script>window.onload=function(){window.print()}<\/script>
+</body>
+</html>`
+
+  const w = window.open('', '_blank', 'width=860,height=960')
+  if (w) {
+    w.document.write(html)
+    w.document.close()
+  }
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
 export default function UserInvoices() {
   const { profile } = useAuth()
   const [invoices, setInvoices] = useState<Invoice[]>([])
@@ -29,151 +170,115 @@ export default function UserInvoices() {
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null)
 
   useEffect(() => {
-    if (profile?.id) {
-      fetchInvoices()
-    }
+    if (profile?.id) fetchInvoices()
   }, [profile?.id])
 
   const fetchInvoices = async () => {
     if (!profile?.id) return
-
+    setLoading(true)
     try {
-      setLoading(true)
       const { data, error } = await supabase
         .from('invoices')
         .select('*')
         .eq('user_id', profile.id)
         .order('created_at', { ascending: false })
-
       if (error) throw error
       setInvoices((data || []) as Invoice[])
-    } catch (error) {
-      console.error('Error fetching invoices:', error)
+    } catch {
     } finally {
       setLoading(false)
     }
   }
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-ES', {
-      style: 'currency',
-      currency: 'EUR',
-    }).format(amount)
-  }
+  // Distinguish media receipts from budget invoices
+  const isMediaReceipt = (inv: Invoice) =>
+    typeof inv.description === 'string' && inv.description.startsWith('stripe:')
 
-  const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString('es-ES', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-    })
-  }
-
-  const pendingAmount = invoices
-    .filter((i) => i.status === 'sent' || i.status === 'overdue')
-    .reduce((sum, i) => sum + i.total, 0)
-
-  const paidAmount = invoices
-    .filter((i) => i.status === 'paid')
-    .reduce((sum, i) => sum + i.total, 0)
+  const paidAmount = invoices.filter(i => i.status === 'paid').reduce((s, i) => s + i.total, 0)
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="font-display text-3xl font-bold text-primary-900">Facturas</h1>
-        <p className="mt-1 text-primary-600">Gestiona tu facturación</p>
+        <h1 className="font-display text-3xl font-bold text-primary-900">Facturas y recibos</h1>
+        <p className="mt-1 text-primary-600">Historial de compras y facturación</p>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         <div className="bg-white border border-primary-200 p-4">
           <p className="text-2xl font-bold text-primary-900">{invoices.length}</p>
-          <p className="text-sm text-primary-500">Total facturas</p>
+          <p className="text-sm text-primary-500">Total documentos</p>
         </div>
         <div className="bg-white border border-primary-200 p-4">
           <p className="text-2xl font-bold text-green-600">
-            {invoices.filter((i) => i.status === 'paid').length}
+            {invoices.filter(i => i.status === 'paid').length}
           </p>
-          <p className="text-sm text-primary-500">Pagadas</p>
+          <p className="text-sm text-primary-500">Pagados</p>
         </div>
         <div className="bg-white border border-primary-200 p-4">
-          <p className="text-2xl font-bold text-orange-600">
-            {formatCurrency(pendingAmount)}
-          </p>
-          <p className="text-sm text-primary-500">Pendiente</p>
-        </div>
-        <div className="bg-white border border-primary-200 p-4">
-          <p className="text-2xl font-bold text-primary-900">
-            {formatCurrency(paidAmount)}
-          </p>
+          <p className="text-2xl font-bold text-primary-900">{fmt(paidAmount)}</p>
           <p className="text-sm text-primary-500">Total pagado</p>
         </div>
       </div>
 
-      {/* Invoices List */}
+      {/* List */}
       {loading ? (
         <div className="flex items-center justify-center py-20">
           <LoadingSpinner size="lg" />
         </div>
       ) : invoices.length > 0 ? (
         <div className="bg-white border border-primary-200 divide-y divide-primary-100">
-          {invoices.map((invoice, index) => {
-            const status = statusConfig[invoice.status]
-
+          {invoices.map((invoice, idx) => {
+            const isMedia = isMediaReceipt(invoice)
             return (
               <motion.div
                 key={invoice.id}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ delay: index * 0.05 }}
+                transition={{ delay: idx * 0.04 }}
                 className="p-4 lg:p-6 hover:bg-primary-50 transition-colors cursor-pointer"
                 onClick={() => setSelectedInvoice(invoice)}
               >
                 <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3">
-                      <span className="font-mono text-sm text-primary-500">
-                        {invoice.invoice_number}
-                      </span>
-                      <span className={`px-2 py-0.5 text-xs font-medium ${status.color}`}>
-                        {status.label}
-                      </span>
+                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                    <div className={`mt-0.5 p-2 rounded-lg flex-shrink-0 ${isMedia ? 'bg-amber-100' : 'bg-primary-100'}`}>
+                      {isMedia
+                        ? <ShoppingBag size={16} className="text-amber-700" />
+                        : <FileText size={16} className="text-primary-600" />
+                      }
                     </div>
-                    <h3 className="mt-2 font-medium text-primary-900">{invoice.title}</h3>
-                    <div className="mt-3 flex items-center gap-4 text-sm text-primary-500">
-                      <span className="flex items-center gap-1">
-                        <Calendar size={14} />
-                        {formatDate(invoice.created_at)}
-                      </span>
-                      {invoice.due_date && (
-                        <span className="flex items-center gap-1">
-                          <Clock size={14} />
-                          Vence: {formatDate(invoice.due_date)}
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono text-xs text-primary-400">{invoice.invoice_number}</span>
+                        <span className="px-2 py-0.5 text-[11px] font-semibold bg-green-100 text-green-800 rounded">
+                          Pagado
                         </span>
-                      )}
-                      {invoice.paid_at && (
-                        <span className="flex items-center gap-1 text-green-600">
-                          <Check size={14} />
-                          Pagada: {formatDate(invoice.paid_at)}
-                        </span>
-                      )}
+                        {isMedia && (
+                          <span className="px-2 py-0.5 text-[11px] font-semibold bg-amber-100 text-amber-800 rounded">
+                            Compra multimedia
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1 font-medium text-primary-900 truncate">{invoice.title}</p>
+                      <p className="mt-1 text-sm text-primary-500 flex items-center gap-1">
+                        <Calendar size={13} />
+                        {fmtDate(invoice.created_at)}
+                      </p>
                     </div>
                   </div>
 
                   <div className="text-right flex-shrink-0">
-                    <p className="text-xl font-bold text-primary-900">
-                      {formatCurrency(invoice.total)}
-                    </p>
+                    <p className="text-xl font-bold text-primary-900">{fmt(invoice.total)}</p>
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
-                        // Download PDF logic here
+                        printReceipt(invoice, profile?.full_name ?? '', profile?.email ?? '')
                       }}
-                      className="mt-2 text-sm text-primary-600 hover:text-primary-900 flex items-center gap-1 ml-auto"
+                      className="mt-2 text-sm text-primary-500 hover:text-primary-900 flex items-center gap-1 ml-auto transition-colors"
                     >
-                      <Download size={14} />
-                      PDF
+                      <Printer size={13} />
+                      Imprimir / PDF
                     </button>
                   </div>
                 </div>
@@ -184,122 +289,188 @@ export default function UserInvoices() {
       ) : (
         <div className="text-center py-20 bg-white border border-primary-200">
           <Receipt size={48} className="mx-auto text-primary-300 mb-4" />
-          <p className="text-primary-600">No tienes facturas</p>
+          <p className="text-primary-700 font-medium">No hay facturas todavía</p>
           <p className="text-sm text-primary-500 mt-2">
-            Cuando recibas una factura, aparecerá aquí.
+            Los recibos de tus compras de archivos aparecerán aquí.
           </p>
         </div>
       )}
 
-      {/* Invoice Detail Modal */}
-      {selectedInvoice && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-          onClick={() => setSelectedInvoice(null)}
-        >
+      {/* Receipt detail modal */}
+      <AnimatePresence>
+        {selectedInvoice && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="bg-white w-full max-w-2xl max-h-[90vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+            onClick={() => setSelectedInvoice(null)}
           >
-            <div className="p-6 border-b border-primary-200">
-              <div className="flex items-start justify-between">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96 }}
+              transition={{ type: 'spring', stiffness: 350, damping: 28 }}
+              className="bg-white w-full max-w-2xl max-h-[92vh] overflow-y-auto shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal header */}
+              <div className="sticky top-0 bg-white border-b border-primary-200 px-6 py-4 flex items-center justify-between z-10">
                 <div>
-                  <span className="font-mono text-sm text-primary-500">
-                    {selectedInvoice.invoice_number}
-                  </span>
-                  <h2 className="mt-1 font-display text-2xl font-bold text-primary-900">
+                  <p className="font-mono text-xs text-primary-400">{selectedInvoice.invoice_number}</p>
+                  <h2 className="font-display text-xl font-bold text-primary-900 mt-0.5">
                     {selectedInvoice.title}
                   </h2>
-                  <p className="mt-1 text-sm text-primary-500">
-                    Emitida: {formatDate(selectedInvoice.created_at)}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => printReceipt(selectedInvoice, profile?.full_name ?? '', profile?.email ?? '')}
+                    className="flex items-center gap-2 px-4 py-2 bg-primary-900 text-white text-sm font-medium hover:bg-primary-800 transition-colors"
+                  >
+                    <Printer size={15} />
+                    Imprimir / PDF
+                  </button>
+                  <button
+                    onClick={() => setSelectedInvoice(null)}
+                    className="p-2 text-primary-400 hover:text-primary-900 transition-colors"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-6 space-y-8">
+
+                {/* Company + Receipt meta */}
+                <div className="flex flex-col sm:flex-row sm:justify-between gap-6 pb-6 border-b-2 border-primary-900">
+                  {/* Company */}
+                  <div>
+                    <p className="font-display text-xl font-bold text-primary-900">De Punta a Chicote</p>
+                    <p className="text-xs font-semibold text-primary-500 mt-0.5 uppercase tracking-wider">{COMPANY.name}</p>
+                    <div className="mt-3 text-sm text-primary-600 space-y-0.5 leading-relaxed">
+                      <p>{COMPANY.address}</p>
+                      <p>{COMPANY.city}</p>
+                      <p>{COMPANY.email}</p>
+                      <p className="font-medium">CIF: {COMPANY.cif}</p>
+                    </div>
+                  </div>
+                  {/* Receipt meta */}
+                  <div className="sm:text-right">
+                    <p className="text-[10px] uppercase tracking-widest text-primary-400 font-semibold">Recibo de compra</p>
+                    <p className="font-mono text-2xl font-bold text-primary-900 mt-1">{selectedInvoice.invoice_number}</p>
+                    <div className="mt-2 text-sm text-primary-500 space-y-0.5">
+                      <p className="flex sm:justify-end items-center gap-1.5">
+                        <Calendar size={13} />
+                        {fmtDate(selectedInvoice.created_at)}
+                      </p>
+                      {selectedInvoice.paid_at && (
+                        <p className="flex sm:justify-end items-center gap-1.5 text-green-700 font-medium">
+                          <Check size={13} />
+                          Pagado el {fmtDate(selectedInvoice.paid_at)}
+                        </p>
+                      )}
+                    </div>
+                    <span className="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 bg-green-100 text-green-800 text-xs font-bold rounded">
+                      <Check size={12} />
+                      PAGADO
+                    </span>
+                  </div>
+                </div>
+
+                {/* Parties */}
+                <div className="grid grid-cols-2 gap-6">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-widest text-primary-400 font-semibold mb-2">Emisor</p>
+                    <p className="font-semibold text-primary-900 text-sm">{COMPANY.name}</p>
+                    <div className="text-sm text-primary-600 mt-1 space-y-0.5 leading-relaxed">
+                      <p>{COMPANY.brand}</p>
+                      <p>{COMPANY.address}</p>
+                      <p>{COMPANY.city}</p>
+                      <p>CIF: {COMPANY.cif}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-widest text-primary-400 font-semibold mb-2">Cliente</p>
+                    <p className="font-semibold text-primary-900 text-sm">{profile?.full_name || 'Cliente'}</p>
+                    <p className="text-sm text-primary-600 mt-1">{profile?.email}</p>
+                  </div>
+                </div>
+
+                {/* Line items table */}
+                <div>
+                  <p className="text-[10px] uppercase tracking-widest text-primary-400 font-semibold mb-3">Conceptos</p>
+                  <div className="border border-primary-200 overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-primary-900 text-white">
+                          <th className="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wider">Descripción</th>
+                          <th className="px-4 py-3 text-center font-semibold text-xs uppercase tracking-wider">Cant.</th>
+                          <th className="px-4 py-3 text-right font-semibold text-xs uppercase tracking-wider">Precio unit.</th>
+                          <th className="px-4 py-3 text-right font-semibold text-xs uppercase tracking-wider">Importe</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-primary-100">
+                        {(selectedInvoice.items as InvoiceItem[]).map((item, i) => (
+                          <tr key={i} className={i % 2 === 1 ? 'bg-primary-50/40' : ''}>
+                            <td className="px-4 py-3 text-primary-900">{item.description}</td>
+                            <td className="px-4 py-3 text-center text-primary-700">{item.quantity}</td>
+                            <td className="px-4 py-3 text-right text-primary-700">{fmt(item.price)}</td>
+                            <td className="px-4 py-3 text-right font-semibold text-primary-900">{fmt(item.quantity * item.price)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Totals */}
+                <div className="flex justify-end">
+                  <div className="w-72 space-y-2 border-t-2 border-primary-200 pt-4">
+                    <div className="flex justify-between text-sm text-primary-600">
+                      <span>Subtotal (sin IVA)</span>
+                      <span>{fmt(selectedInvoice.subtotal)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm text-primary-600">
+                      <span>IVA ({selectedInvoice.tax_rate}%)</span>
+                      <span>{fmt(selectedInvoice.tax_amount)}</span>
+                    </div>
+                    <div className="flex justify-between text-xl font-bold text-primary-900 border-t-2 border-primary-900 pt-3 mt-2">
+                      <span>Total</span>
+                      <span>{fmt(selectedInvoice.total)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer note */}
+                <div className="bg-primary-50 border border-primary-200 p-4">
+                  <p className="text-xs text-primary-500 leading-relaxed">
+                    Este documento acredita el pago realizado y sirve como comprobante de compra.
+                    Conserve este recibo para sus registros contables.<br />
+                    <span className="font-medium">{COMPANY.name} · CIF {COMPANY.cif}</span>
                   </p>
                 </div>
-                <button
-                  onClick={() => setSelectedInvoice(null)}
-                  className="p-2 text-primary-400 hover:text-primary-900"
-                >
-                  <X size={24} />
-                </button>
-              </div>
-            </div>
 
-            <div className="p-6 space-y-6">
-              {/* Status */}
-              <div className="flex items-center gap-3">
-                <span
-                  className={`px-3 py-1 text-sm font-medium ${
-                    statusConfig[selectedInvoice.status].color
-                  }`}
-                >
-                  {statusConfig[selectedInvoice.status].label}
-                </span>
-                {selectedInvoice.due_date &&
-                  selectedInvoice.status !== 'paid' && (
-                    <span className="text-sm text-primary-500">
-                      Vencimiento: {formatDate(selectedInvoice.due_date)}
-                    </span>
-                  )}
-              </div>
-
-              {/* Items */}
-              <div>
-                <h3 className="font-medium text-primary-900 mb-3">Conceptos</h3>
-                <div className="border border-primary-200 divide-y divide-primary-100">
-                  {(selectedInvoice.items as Array<{ description: string; quantity: number; price: number }>).map(
-                    (item, i) => (
-                      <div key={i} className="p-3 flex items-center justify-between">
-                        <div>
-                          <p className="text-primary-900">{item.description}</p>
-                          <p className="text-sm text-primary-500">
-                            {item.quantity} x {formatCurrency(item.price)}
-                          </p>
-                        </div>
-                        <p className="font-medium text-primary-900">
-                          {formatCurrency(item.quantity * item.price)}
-                        </p>
-                      </div>
-                    )
-                  )}
+                {/* Download action */}
+                <div className="flex justify-end gap-3 pt-2">
+                  <button
+                    onClick={() => setSelectedInvoice(null)}
+                    className="px-5 py-2.5 border border-primary-200 text-primary-700 text-sm hover:bg-primary-50 transition-colors"
+                  >
+                    Cerrar
+                  </button>
+                  <button
+                    onClick={() => printReceipt(selectedInvoice, profile?.full_name ?? '', profile?.email ?? '')}
+                    className="px-5 py-2.5 bg-primary-900 text-white text-sm font-medium hover:bg-primary-800 transition-colors flex items-center gap-2"
+                  >
+                    <Download size={16} />
+                    Guardar como PDF
+                  </button>
                 </div>
               </div>
-
-              {/* Totals */}
-              <div className="border-t border-primary-200 pt-4 space-y-2">
-                <div className="flex items-center justify-between text-primary-600">
-                  <span>Subtotal</span>
-                  <span>{formatCurrency(selectedInvoice.subtotal)}</span>
-                </div>
-                <div className="flex items-center justify-between text-primary-600">
-                  <span>IVA ({selectedInvoice.tax_rate}%)</span>
-                  <span>{formatCurrency(selectedInvoice.tax_amount)}</span>
-                </div>
-                <div className="flex items-center justify-between text-xl font-bold text-primary-900 pt-2">
-                  <span>Total</span>
-                  <span>{formatCurrency(selectedInvoice.total)}</span>
-                </div>
-              </div>
-
-              {/* Notes */}
-              {selectedInvoice.notes && (
-                <div className="bg-primary-50 p-4 border border-primary-200">
-                  <p className="text-sm font-medium text-primary-700 mb-1">Notas:</p>
-                  <p className="text-sm text-primary-600">{selectedInvoice.notes}</p>
-                </div>
-              )}
-
-              {/* Actions */}
-              <div className="flex items-center justify-end gap-4 pt-4">
-                <button className="px-6 py-2 bg-primary-900 text-white hover:bg-primary-800 flex items-center gap-2">
-                  <Download size={18} />
-                  Descargar PDF
-                </button>
-              </div>
-            </div>
+            </motion.div>
           </motion.div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
     </div>
   )
 }
