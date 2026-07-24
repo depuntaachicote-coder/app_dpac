@@ -183,6 +183,9 @@ export default function UserInvoices() {
   const hasFacturaRequested = (inv: Invoice) =>
     typeof inv.notes === 'string' && inv.notes.includes('[FACTURA_SOLICITADA]')
 
+  const hasFacturaEnviada = (inv: Invoice) =>
+    typeof inv.notes === 'string' && inv.notes.includes('[FACTURA_ENVIADA:')
+
   const openRequestModal = (inv: Invoice, e: React.MouseEvent) => {
     e.stopPropagation()
     setRequestModal(inv)
@@ -337,7 +340,12 @@ export default function UserInvoices() {
                       Imprimir / PDF
                     </button>
 
-                    {hasFacturaRequested(invoice) ? (
+                    {hasFacturaEnviada(invoice) ? (
+                      <span className="flex items-center gap-1 text-[11px] font-semibold text-green-700 ml-auto justify-end">
+                        <Check size={11} />
+                        Factura enviada
+                      </span>
+                    ) : hasFacturaRequested(invoice) ? (
                       <span className="flex items-center gap-1 text-[11px] font-semibold text-blue-700 ml-auto justify-end">
                         <Check size={11} />
                         Factura solicitada
