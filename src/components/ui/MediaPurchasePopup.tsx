@@ -171,7 +171,7 @@ export default function MediaPurchasePopup({ profile }: MediaPurchasePopupProps)
 
   const goToMedia = () => {
     dismiss()
-    navigate('/dashboard/media')
+    navigate('/dashboard/media?tab=buy')
   }
 
   const packSavings =

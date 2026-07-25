@@ -40,7 +40,10 @@ export default function UserMedia() {
   const [media, setMedia] = useState<Media[]>([])
   const [property, setProperty] = useState<Property | null>(null)
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'all' | 'image' | 'video' | 'buy'>('all')
+  const initialTab = searchParams.get('tab') as 'all' | 'image' | 'video' | 'buy' | null
+  const [activeTab, setActiveTab] = useState<'all' | 'image' | 'video' | 'buy'>(
+    initialTab === 'buy' || initialTab === 'image' || initialTab === 'video' ? initialTab : 'all'
+  )
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
 
