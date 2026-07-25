@@ -120,12 +120,10 @@ export default function MediaPurchasePopup({ profile }: MediaPurchasePopupProps)
         withPrice: rows.filter(m => m.price != null).length,
       })
 
-      // Mostrar popup por archivos bloqueados (is_available=false) O que tienen precio
-      // y no han sido comprados — cualquiera de las dos condiciones activa el popup
+      // Archivos bloqueados: misma lógica que UserMedia (Comprar tab)
+      // is_available=false y no comprados por este usuario
       const locked = rows.filter(
-        (m) =>
-          !purchasedIds.has(m.id) &&
-          (!m.is_available || m.price != null)
+        (m) => !m.is_available && !purchasedIds.has(m.id)
       )
 
       console.log(tag, 'Archivos a mostrar en popup:', locked.length)
